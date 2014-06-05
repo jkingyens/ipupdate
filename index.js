@@ -17,13 +17,18 @@ var server = http.createServer(function (req, res) {
     return res.end();
 
   }
+  
+  var realIp = req.headers['x-forwarded-for'];
+  if (realIp.indexOf('::') !== -1) { 
+    realIp = realIp.replace('::ffff:','');
+  }
 
   var args = {
     zoneId : process.env.AWS_ROUTE53_ZONEID,
     name   : process.env.AWS_ROUTE53_RECORD_NAME,
     type   : 'A',
     ttl    : 300,
-    values : [ req.socket.remoteAddress ]
+    values : [ realIp ] 
   };
 
   client.setRecord(args, function(err, ares) {
@@ -36,15 +41,9 @@ var server = http.createServer(function (req, res) {
 
     } else {
 
-      var ee = client.pollChangeUntilInSync(ares.changeId, 10);
-
-      ee.on('insync', function(changeInfo) {
-
         res.statusCode = 200;
-        res.write(process.env.AWS_ROUTE53_RECORD_NAME + ' now points to ' + req.socket.remoteAddress, 'utf8');
+        res.write(process.env.AWS_ROUTE53_RECORD_NAME + ' now points to ' + realIp, 'utf8');
         res.end();
-
-      });
 
     }
 
